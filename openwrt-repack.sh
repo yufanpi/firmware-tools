@@ -58,6 +58,7 @@ Options:
  -w                        enable wireless by default
  -x <commands>             execute commands after all other operations
  -F                        ignore errors during modification
+ -R <new_romfile>          repack new romfile by current files
 
 EOF
 
@@ -264,13 +265,28 @@ do_firmware_repack()
 	print_green ">>> Done. New firmware: $new_romfile"
 
 	# Copy files for rapid debugging
-	[ -d /tftpboot ] && cp -vf "$new_romfile" /tftpboot/recovery.bin
-	[ -L recovery.bin ] && ln -sf "$new_romfile" recovery.bin
+	#[ -d /tftpboot ] && cp -vf "$new_romfile" /tftpboot/recovery.bin
+	#[ -L recovery.bin ] && ln -sf "$new_romfile" recovery.bin
 
-	rm -f root.squashfs* uImage.bin
-	rm -rf $rootfs_root /tmp/opkg-lists
+	#rm -f root.squashfs* uImage.bin
+	#rm -rf $rootfs_root /tmp/opkg-lists
 
 	exit $__rc
+}
+
+repack_exist()
+{
+	local rootfs_root=squashfs-root
+    local new_romfile=$1
+    if [ -z "$new_romfile" ]; then
+        new_romfile="new_romfile"
+    fi
+	print_green ">>> Repackaging the modified firmware ..."
+	mksquashfs $rootfs_root root.squashfs -nopad -noappend -root-owned -comp xz -Xpreset 9 -Xe -Xlc 0 -Xlp 2 -Xpb 2 -b 256k -p '/dev d 755 0 0' -p '/dev/console c 600 0 0 5 1' -processors 1
+	cat uImage.bin root.squashfs > "$new_romfile"
+	padjffs2 "$new_romfile" 4 8 16 64 128 256
+
+	print_green ">>> Done. New firmware: $new_romfile"
 }
 
 clean_env()
@@ -284,6 +300,7 @@ clean_env()
 case "$1" in
 	-c) clean_env;;
 	-h|--help) print_help;;
+    -R|--repack) shift;repack_exist "$@";;
 	*) do_firmware_repack "$@";;
 esac
 
